@@ -2,8 +2,7 @@
 <html lang="en" xmlns="http://www.w3.org/1999/html">
 <head>
   <meta charset="UTF-8">
-  <title>Title</title>
-  <!--  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>-->
+  <title>MT spent time</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
 
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.1/dist/css/bootstrap.min.css"
@@ -16,7 +15,524 @@
 </head>
 
 <body>
-  <label class="form-label" >Time zones with UTC (default +7 Novosibirsk)</label>
+<div class="container">
+
+
+  <div class="row">
+    <div class="col-2"></div>
+    <div id="myForm" class="col-8">
+      <div class="row">
+        <div class="accordion " id="accordionExample">
+          <div class="accordion-item">
+            <h2 class="accordion-header" id="headingOne">
+              <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                      data-bs-target="#collapseOne" aria-expanded="false"
+                      aria-controls="collapseOne">
+                Help
+              </button>
+            </h2>
+            <div id="collapseOne" class="accordion-collapse collapse" aria-labelledby="headingOne"
+                 data-bs-parent="#accordionExample">
+              <div class="accordion-body">
+                Create <a href="https://www.mindmeister.com/api#api_access_tokens">"Personal access
+                token"</a> with access rule "meistertask.readonly".
+                <br>
+                Fill api key, time zone and save page in favorites.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="row row-cols-4">
+        <div class="col-3">
+          <label class="form-label" for="apiKey"
+                 href="https://www.mindmeister.com/api#api_access_tokens">Personal access
+            token:</label>
+        </div>
+        <div class="col-5">
+          <input class="form-control " type="text" id="apiKey" required>
+        </div>
+        <div class="col-3">
+          <button type="button " class="btn btn-primary" id="btnLoadProjects">Load projects
+          </button>
+        </div>
+        <div class="col-1">
+          <div class="spinner-border invisible" role="status" id="loadProjectSpinner">
+          </div>
+        </div>
+      </div>
+
+      <div class="row row-cols-2">
+        <div class="col">
+          <label class="col-form-label" for="selectProject">Select project</label>
+        </div>
+        <div class="col">
+          <select class="form-select" id="selectProject"></select>
+        </div>
+      </div>
+      <div class=" form-group row">
+        <div class="col">
+          <label class="col-form-label" for="tz">Time zones with UTC (default +7
+            Novosibirsk)</label>
+        </div>
+        <div class="col">
+          <input class="form-control" type="number" id="tz" min="-12" max="12" value="7">
+        </div>
+      </div>
+      <div class="row row-cols-5">
+        <div class="col">
+          <button type="button" class="btn btn-primary" id="btnSetLastMonth">Last month
+          </button>
+        </div>
+        <div class="col">
+          <button type="button" class="btn btn-primary" id="btnSetCurrentMonth">Current month
+          </button>
+        </div>
+      </div>
+
+      <div class="row ">
+        <div class="col-1">
+          <label class="col-sm-1 col-form-label" for="filterFrom">from</label>
+        </div>
+        <div class="col-3">
+          <input class="form-control" type="date" id="filterFrom">
+        </div>
+        <div class="col-1">
+          <label class="col-sm-1 col-form-label" for="filterTo">to</label>
+        </div>
+        <div class="col-3">
+          <input class="form-control" type="date" id="filterTo">
+        </div>
+        <div class="col-3">
+          <button type="button" class="btn btn-primary" id="getData">Load</button>
+        </div>
+        <div class="col-1">
+          <div class="spinner-border invisible" role="status" id="loadDataSpinner">
+          </div>
+        </div>
+      </div>
+
+      <div class="row row-cols-3">
+        <div class="col">
+          <label class="col-form-label" for="selectUser">Select person</label>
+        </div>
+        <div class="col">
+          <select class="form-select" id="selectUser"></select>
+        </div>
+        <div class="col">
+          <button type="button" class="btn btn-primary" id="drawChart">Redraw chart</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-2"></div>
+  </div>
+</div>
+
+<br>
+<div id="charts" style="max-width: 660px; margin: 0px auto;"></div>
+
+
 </body>
-  
+
+<script>
+
+  let urlParams = new URLSearchParams(window.location.search);
+
+  let projectMap = new Map()
+  let usersMap = new Map()
+  let tasksMap = new Map()
+
+  let filterFrom = document.getElementById('filterFrom')
+  let filterTo = document.getElementById('filterTo')
+  let myForm = document.getElementById('myForm')
+  let timeZone = document.getElementById('tz')
+  let apiKey = document.getElementById('apiKey')
+  let loadProjectSp = $('#loadProjectSpinner')
+  let loadDataSp = $('#loadDataSpinner')
+
+  document.getElementById('btnSetCurrentMonth').onclick = function () {
+    let d1 = new Date()
+    d1.setDate(1)
+    let d2 = new Date()
+    d2.setMonth(d2.getMonth() + 1)
+    d2.setDate(0)
+    filterFrom.valueAsDate = d1
+    filterTo.valueAsDate = d2
+  }
+  document.getElementById('btnSetLastMonth').onclick = function () {
+    let d1 = new Date()
+    d1.setDate(1)
+    d1.setMonth(d1.getMonth() - 1)
+    let d2 = new Date()
+    d2.setMonth(d2.getMonth())
+    d2.setDate(0)
+    filterFrom.valueAsDate = d1
+    filterTo.valueAsDate = d2
+  }
+
+  function msToHrs(ms) {
+    let hours = (ms / (1000 * 60 * 60)).toFixed(2);
+    return parseFloat(hours)
+  }
+
+  function drawBarColors() {
+    let userId = parseInt(document.getElementById("selectUser").value)
+    window.arr2.sort((a, b) => Date.parse(a.date) - Date.parse(b.date))
+    let chartsMap = new Map();
+
+    document.getElementById("charts").innerHTML = ""
+
+    if (userId === -1) {
+      console.log('userId', userId)
+      let i = 0
+      window.usersMap.forEach(function (value, key) {
+        if (window.usersSet.has(key)) {
+          let data = []
+          window.arr2.forEach(function (v) {
+            if (v.person_id === key && v.elapsed) {
+              data.push([v.date, msToHrs(v.elapsed)])
+            }
+          })
+          console.log("data " + value, data)
+          let divName = addDiv(value, i, data.length)
+          if (data.length > 0) {
+            chartsMap.set(divName, data)
+          }
+          i++;
+        }
+      })
+    } else {
+      let data = []
+      window.arr2.forEach(function (v) {
+        if (v.person_id === userId) {
+          data.push([v.date, msToHrs(v.elapsed)])
+        }
+      })
+      let userName = window.usersMap.get(userId)
+      let divName = addDiv(userName, 0, data.length)
+      if (data.length > 0) {
+        chartsMap.set(divName, data)
+      }
+    }
+
+    chartsMap.forEach(function (data, chartName) {
+      console.log(chartName)
+      let s = document.getElementById(chartName).style
+      console.log(chartName, s)
+      makeChart(chartName, data)
+    })
+
+    function addDiv(userName, i, dataLength) {
+      let name = "chartDiv_" + i
+      document.getElementById("charts").innerHTML += `<label><b>${userName}</b></label><br>`
+      if (dataLength > 0) {
+        document.getElementById("charts").innerHTML += `
+        <div id="${name}" style="max-width: 660px; height: 480px; margin: 0px auto;"></div>
+        <br>`
+      } else {
+        document.getElementById("charts").innerHTML += `<label><b>\t Empty</b></label><br><br>`
+      }
+      return name
+    }
+
+    function makeLabels(p) {
+      let goal = 8;
+
+      if (p.replaceTokens('%zValue') < goal) {
+        return (
+            '<span style="align:right; color:#757575; font-size:11px">%name</span><br>' +
+            '<absolute><chart pie data=' +
+            p.replaceTokens('%zValue') +
+            ',' +
+            (goal - p.replaceTokens('%zValue')) +
+            ' size=42 colors=,' +
+            p.replaceTokens('%color') +
+            ',#F5F5F5 align=center verticalAlign=middle>' +
+            '<icon name=system/default/circle size=30 color=white margin_left=10 align=center verticalAlign=middle><span style="width:50px; align:center;"><b>%zValue</b></span></absolute>'
+        );
+      } else {
+        return (
+            '<span style="align:right; color:#757575; font-size:11px">%name</span><br>' +
+            '<absolute><chart pie data=' +
+            p.replaceTokens('%zValue') +
+            ',1 size=42 colors=,' +
+            p.replaceTokens('%color') +
+            ',' +
+            p.replaceTokens('%color') +
+            ' align=center verticalAlign=middle>' +
+            '<icon name=system/default/circle size=30 color=white margin_left=10 align=center verticalAlign=middle><span style="width:50px; align:center;"><b>%zValue</b></span></absolute>'
+        );
+      }
+    }
+
+    function makeChart(id, data) {
+      window.id = JSC.chart(id, {
+        debug: true,
+        type: 'calendar month solid',
+        data: data,
+        legend: {
+          title_label: {
+            text: '<b>Select Month.</b><br>Total spent. Month.',
+            align: 'right',
+            style: {fontSize: '15px'}
+          },
+          defaultEntry: {
+            style: {fontSize: '13px'},
+            states_hidden_color: '#a5a5a5'
+          }
+        },
+        palette: {
+          colors: ['#d73027', '#f46d43', '#fdae61', '#fee08b', '#d9ef8b', '#a6d96a', '#66bd63',
+            '#1a9850'],
+          colorBar_axis: {scale_interval: 5}
+        },
+        calendar: {
+          defaultEdgePoint: {mouseTracking: false, label_visible: false},
+          defaultEmptyPoint: {
+            outline_width: 0,
+            hatch: {style: 'none'},
+            opacity: 0.5,
+            legendEntry_visible: false
+          }
+        },
+        title: {
+          label: {
+            text: 'Spent Hrs',
+            style_fontSize: 15
+          }
+        },
+        yAxis_visible: false,
+        defaultPoint: {
+          opacity: 0.00001,
+          focusGlow_width: 0,
+          label: {
+            color: '#424242',
+            verticalAlign: 'top',
+            text: function (p) {
+              return makeLabels(p);
+            }
+          },
+          outline_width: 0,
+          tooltip: '<b>{%date:date D}</b><br> Spent %zValue hrs'
+        },
+        defaultSeries_shape_innerPadding: 0.04,
+        toolbar_visible: false
+      });
+    }
+  }
+
+  function getTaskNameById(id) {
+    if (tasksMap.has(id)) {
+      return tasksMap.get(id)
+    }
+    {
+      //     https://www.meistertask.com/api/tasks/:id
+      $.getJSON('https://www.meistertask.com/api/tasks' + id, function (data) {
+        tasksMap.set(data.id, data.name)
+      })
+      return tasksMap.get(id)
+    }
+  }
+
+  function getUserById(id) {
+    return usersMap.get(id)
+  }
+
+  function loadData() {
+
+    let dateFrom = filterFrom.valueAsDate;
+    let dateTo = filterTo.valueAsDate;
+    let tz = timeZone.value;
+    let tzInt = parseInt(tz)
+    console.log("tz: ", typeof tz, tz)
+    console.log("tzInt: ", typeof tzInt, tzInt)
+    dateTo.setHours(23)
+    dateTo.setMinutes(59)
+    dateTo.setSeconds(59)
+    console.log(dateFrom, dateTo)
+
+    let pid = document.getElementById("selectProject").value
+
+    function groupBy(list, keyGetter) {
+      const map = new Map();
+      list.forEach((item) => {
+        const key = keyGetter(item);
+        const collection = map.get(key);
+        if (!collection) {
+          map.set(key, [item]);
+        } else {
+          collection.push(item);
+        }
+      });
+      return map;
+    }
+
+    Array.prototype.sum = function (prop) {
+      var total = 0
+      for (var i = 0, _len = this.length; i < _len; i++) {
+        total += this[i][prop]
+      }
+      return total
+    }
+
+    window.usersSet = new Set();
+    $.getJSON(`https://www.meistertask.com/api/projects/${pid}/work_intervals?`, function (data) {
+      let arr = data.filter(v => {
+        let started = Date.parse(v.started_at)
+        // console.log(dateFrom, started, dateTo)
+        let a = dateFrom <= started //&&  started <= dateTo
+        let b = started <= dateTo
+        return a && b
+      }).map(function (v) {
+        usersSet.add(v.person_id)
+        v.elapsed = Date.parse(v.finished_at) - Date.parse(v.started_at)
+
+        let y = new Date(v.started_at);
+        y.setHours(y.getHours() + tzInt);
+        let z = y.toISOString().substring(0, 10)
+        v.date = z
+        if (v.started_at.substring(0, 10) === "2021-05-20" && v.person_id === 66172233) {
+          console.log("v " + v.started_at.substring(11, 100), v)
+        }
+        v.groupKey = v.person_id + "_" + z
+        return v;
+      })
+
+      console.log('length', data.length)
+      console.log('length arr ', arr.length)
+
+      let arr2 = []
+      let grouped = groupBy(arr, x => x.groupKey)
+
+      grouped.forEach(function (v, k, m) {
+        let x = {}
+        x.person_id = v[0].person_id
+        x.date = v[0].date
+        x.name = getUserById(v[0].person_id)
+        x.elapsed = v.sum("elapsed")
+        arr2.push(x)
+      })
+
+      console.log('grouped', grouped)
+      console.log('length arr2 ', arr2.length)
+      console.log('arr2 ', arr2)
+      window.usersMap = usersMap
+      window.arr2 = arr2
+
+      // set options
+      let arrOptions = ["<option value='-1'>All</option>"]
+      usersMap.forEach(function (v, k, m) {
+        if (usersSet.has(k)) {
+          arrOptions.push(`<option value='${k}'>${v}</option>`)
+        }
+      })
+      document.getElementById("selectUser").innerHTML = arrOptions.join();
+    });
+
+  }
+
+  function updateHref() {
+    let href = window.location.href
+    let index = href.lastIndexOf('?');
+    if (index < 0) {
+      window.history.pushState(new Date(), document.title, href + '?' + urlParams.toString());
+    } else {
+      window.history.pushState(new Date(), document.title, href.substring(0, index + 1) + urlParams.toString());
+    }
+  }
+
+  document.getElementById("btnLoadProjects").onclick = function () {
+    loadProjectSp.removeClass("invisible")
+    loadProjectSp.addClass("visible")
+    let apiKey = document.getElementById("apiKey").value
+    console.log(apiKey)
+
+    $.ajaxSetup({
+      headers: {
+        'Authorization': 'Bearer ' + apiKey
+      }
+    });
+
+    function loadUsers() {
+      $.getJSON('https://www.meistertask.com/api/persons', function (data) {
+        data.forEach(function (v) {
+              // console.log("person ", v)
+              let userName = (v.lastname + " " + v.firstname).trim()
+              if (userName.length > 0) {
+                usersMap.set(v.id, userName)
+              }
+            }
+        )
+        console.log('users', usersMap)
+
+        loadProjectSp.removeClass("visible")
+        loadProjectSp.addClass("invisible")
+      });
+    }
+
+    $.getJSON('https://www.meistertask.com/api/projects', function (data) {
+      data.forEach(function (v) {
+            // console.log("project ", v)
+            let projectName = v.name.trim()
+            if (projectName.length > 0) {
+              projectMap.set(v.id, projectName)
+            }
+          }
+      )
+      let arrOptions = []
+      projectMap.forEach(function (v, k) {
+        arrOptions.push(`<option value='${k}'>${v}</option>`)
+      })
+      document.getElementById("selectProject").innerHTML = arrOptions.join();
+      console.log('projects', projectMap)
+      loadUsers()
+    });
+  }
+
+  document.getElementById("getData").onclick = function () {
+    loadDataSp.removeClass("invisible")
+    loadDataSp.addClass("visible")
+
+    loadData();
+
+    loadDataSp.removeClass("visible")
+    loadDataSp.addClass("invisible")
+  }
+
+  document.getElementById("drawChart").onclick = function () {
+    drawBarColors();
+  }
+
+  apiKey.oninput = function () {
+    urlParams.set("apiKey", apiKey.value)
+    updateHref()
+  }
+
+  timeZone.oninput = function () {
+    urlParams.set("timeZone", timeZone.value)
+    updateHref()
+  }
+
+  $(document).ready(function () {
+    let d2 = new Date()
+    d2.setMonth(d2.getMonth() - 1);
+    d2.setDate(1);
+    filterFrom.valueAsDate = d2;
+    filterTo.valueAsDate = new Date();
+
+    // let urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has("apiKey")) {
+      apiKey.value = urlParams.get("apiKey")
+    }
+    if (urlParams.has("timeZone")) {
+      timeZone.value = urlParams.get("timeZone")
+    }
+  });
+
+</script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.1/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-gtEjrD/SeCtmISkJkNUaaKMoLD0//ElJ19smozuHV6z3Iehds+3Ulb9Bn9Plx0x4"
+        crossorigin="anonymous"></script>
+
 </html>
